@@ -100,8 +100,8 @@ def main(_):
       if (e + 1) % FLAGS.log_period == 0:
         util.print_stats("Epoch {}".format(e + 1), total_cost, total_time,
                          FLAGS.log_period)
-        util.save_loss(total_cost, FLAGS.log_period, 'log/train_loss')
-        util.save_loss(total_test_loss, FLAGS.log_period, 'log/test_loss')
+        util.save_loss(total_cost, FLAGS.log_period, 'log/l2l_train_loss', total_time)
+        util.save_loss(total_test_loss, FLAGS.log_period, 'log/l2l_test_loss', total_time)
         total_time = 0
         total_cost = 0
         total_test_loss = 0

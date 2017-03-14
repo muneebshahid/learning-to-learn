@@ -43,9 +43,9 @@ def print_stats(header, total_error, total_time, n):
   print("Log Mean Final Error: {:.2f}".format(np.log10(total_error / n)))
   print("Mean epoch time: {:.2f} s".format(total_time / n))
 
-def save_loss(loss, n, file_name):
+def save_loss(loss, n, file_name, time):
     with open(file_name, 'a')  as log_file:
-        log_file.write("{:.2f}".format(np.log10(loss / n)) + "\n")
+        log_file.write("{:.2f}".format(np.log10(loss / n)) + " " + "{:.2f}".format(time) + "\n")
 
 
 

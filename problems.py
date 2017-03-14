@@ -152,12 +152,17 @@ def mnist(layers,  # pylint: disable=invalid-name
   else:
     raise ValueError("{} activation not supported".format(activation))
 
-  # Data.
+  def get_data(data, mode):
+    # Data.
+    mode_data = getattr(data, mode)
+    images = tf.constant(mode_data.images, dtype=tf.float32, name="MNIST_images_" + mode)
+    images = tf.reshape(images, [-1, 28, 28, 1])
+    labels = tf.constant(mode_data.labels, dtype=tf.int64, name="MNIST_labels_" + mode)
+    return mode_data, images, labels
+
   data = mnist_dataset.load_mnist()
-  data = getattr(data, mode)
-  images = tf.constant(data.images, dtype=tf.float32, name="MNIST_images")
-  images = tf.reshape(images, [-1, 28, 28, 1])
-  labels = tf.constant(data.labels, dtype=tf.int64, name="MNIST_labels")
+  train_data, train_images, train_labels = get_data(data, 'train')
+  test_data, test_images, test_labels = get_data(data, 'test')
 
   # Network.
   mlp = nn.MLP(list(layers) + [10],
@@ -165,15 +170,21 @@ def mnist(layers,  # pylint: disable=invalid-name
                initializers=_nn_initializers)
   network = nn.Sequential([nn.BatchFlatten(), mlp])
 
-  def build():
-    indices = tf.random_uniform([batch_size], 0, data.num_examples, tf.int64)
-    batch_images = tf.gather(images, indices)
-    batch_labels = tf.gather(labels, indices)
+  def test_loss():
+    indices = tf.random_uniform([batch_size], 0, test_data.num_examples, tf.int64)
+    batch_images = tf.gather(test_images, indices)
+    batch_labels = tf.gather(test_labels, indices)
     output = network(batch_images)
     return _xent_loss(output, batch_labels)
 
-  return build
+  def train_loss():
+    indices = tf.random_uniform([batch_size], 0, train_data.num_examples, tf.int64)
+    batch_images = tf.gather(train_images, indices)
+    batch_labels = tf.gather(train_labels, indices)
+    output = network(batch_images)
+    return _xent_loss(output, batch_labels)
 
+  return train_loss, test_loss
 
 CIFAR10_URL = "http://www.cs.toronto.edu/~kriz"
 CIFAR10_FILE = "cifar-10-binary.tar.gz"

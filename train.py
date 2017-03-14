@@ -24,6 +24,8 @@ from six.moves import xrange
 import tensorflow as tf
 
 from tensorflow.contrib.learn.python.learn import monitored_session as ms
+from tensorflow.contrib.learn.python.learn.datasets import mnist as mnist_dataset
+
 
 import meta
 import util
@@ -35,11 +37,11 @@ logging = tf.logging
 FLAGS = flags.FLAGS
 flags.DEFINE_string("save_path", None, "Path for saved meta-optimizer.")
 flags.DEFINE_integer("num_epochs", 10000, "Number of training epochs.")
-flags.DEFINE_integer("log_period", 100, "Log period.")
+flags.DEFINE_integer("log_period", 10, "Log period.")
 flags.DEFINE_integer("evaluation_period", 1000, "Evaluation period.")
 flags.DEFINE_integer("evaluation_epochs", 20, "Number of evaluation epochs.")
 
-flags.DEFINE_string("problem", "simple", "Type of problem.")
+flags.DEFINE_string("problem", "mnist", "Type of problem.")
 flags.DEFINE_integer("num_steps", 100,
                      "Number of optimization steps per epoch.")
 flags.DEFINE_integer("unroll_length", 20, "Meta-optimizer unroll length.")
@@ -57,45 +59,59 @@ def main(_):
     else:
       os.mkdir(FLAGS.save_path)
 
+  test_images = tf.placeholder(tf.float32, shape=[None, 28, 28, 1])
+  test_labels = tf.placeholder(tf.float32, shape=[None])
+
   # Problem.
   problem, net_config, net_assignments = util.get_config(FLAGS.problem)
-
+  # problem, test_loss, test_data = problem[0], problem[1], mnist_dataset.load_mnist().test
+  # ims = test_data.images.reshape((-1, 28, 28, 1))
+  # lbs = test_data.labels
   # Optimizer setup.
   optimizer = meta.MetaOptimizer(**net_config)
-  minimize = optimizer.meta_minimize(
+  minimize, fx_test = optimizer.meta_minimize(
       problem, FLAGS.unroll_length,
       learning_rate=FLAGS.learning_rate,
       net_assignments=net_assignments,
       second_derivatives=FLAGS.second_derivatives)
   step, update, reset, cost_op, _ = minimize
 
+
+
   with ms.MonitoredSession() as sess:
     # Prevent accidental changes to the graph.
     tf.get_default_graph().finalize()
-
+    # sess.run(test_loss(test_images, test_labels), feed_dict={test_images: ims[0], test_labels: lbs[0]})
     best_evaluation = float("inf")
     total_time = 0
     total_cost = 0
+    total_test_loss = 0
     for e in xrange(FLAGS.num_epochs):
+
       # Training.
-      time, cost = util.run_epoch(sess, cost_op, [update, step], reset,
-                                  num_unrolls)
+      time, cost, test_loss = util.run_epoch(sess, cost_op, [update, step], reset,
+                                  num_unrolls, test_loss=fx_test)
+
       total_time += time
       total_cost += cost
+      total_test_loss += test_loss
 
       # Logging.
       if (e + 1) % FLAGS.log_period == 0:
         util.print_stats("Epoch {}".format(e + 1), total_cost, total_time,
                          FLAGS.log_period)
+        util.save_loss(total_cost, FLAGS.log_period, 'log/train_loss')
+        util.save_loss(total_test_loss, FLAGS.log_period, 'log/test_loss')
         total_time = 0
         total_cost = 0
+        total_test_loss = 0
 
       # Evaluation.
       if (e + 1) % FLAGS.evaluation_period == 0:
         eval_cost = 0
         eval_time = 0
         for _ in xrange(FLAGS.evaluation_epochs):
-          time, cost = util.run_epoch(sess, cost_op, [update], reset,
+          time, cost, _  = util.run_epoch(sess, cost_op, [update], reset,
                                       num_unrolls)
           eval_time += time
           eval_cost += cost
@@ -110,6 +126,7 @@ def main(_):
           print("Saving meta-optimizer to {}".format(FLAGS.save_path))
           optimizer.save(sess, FLAGS.save_path)
           best_evaluation = eval_cost
+  sess.close()
 
 
 if __name__ == "__main__":

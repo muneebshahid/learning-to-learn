@@ -280,7 +280,7 @@ class MetaOptimizer(object):
 
     # Construct an instance of the problem only to grab the variables. This
     # loss will never be evaluated.
-    x, constants = _get_variables(make_loss)
+    x, constants = _get_variables(make_loss[0])
 
     print("Optimizee variables")
     print([op.name for op in x])
@@ -329,7 +329,7 @@ class MetaOptimizer(object):
       state_next = []
 
       with tf.name_scope("fx"):
-        fx = _make_with_custom_variables(make_loss, x)
+        fx = _make_with_custom_variables(make_loss[0], x)
         fx_array = fx_array.write(t, fx)
 
       with tf.name_scope("dx"):
@@ -358,8 +358,9 @@ class MetaOptimizer(object):
         name="unroll")
 
     with tf.name_scope("fx"):
-      fx_final = _make_with_custom_variables(make_loss, x_final)
+      fx_final = _make_with_custom_variables(make_loss[0], x_final)
       fx_array = fx_array.write(len_unroll, fx_final)
+      fx_test = _make_with_custom_variables(make_loss[1], x_final)
 
     loss = tf.reduce_sum(fx_array.stack(), name="loss")
 
@@ -381,7 +382,7 @@ class MetaOptimizer(object):
       print("Optimizer '{}' variables".format(k))
       print([op.name for op in nn.get_variables_in_module(net)])
 
-    return MetaLoss(loss, update, reset, fx_final, x_final)
+    return MetaLoss(loss, update, reset, fx_final, x_final), fx_test
 
   def meta_minimize(self, make_loss, len_unroll, learning_rate=0.01, **kwargs):
     """Returns an operator minimizing the meta-loss.
@@ -396,7 +397,7 @@ class MetaOptimizer(object):
     Returns:
       namedtuple containing (step, update, reset, fx, x)
     """
-    info = self.meta_loss(make_loss, len_unroll, **kwargs)
+    info, fx_test = self.meta_loss(make_loss, len_unroll, **kwargs)
     optimizer = tf.train.AdamOptimizer(learning_rate)
     step = optimizer.minimize(info.loss)
-    return MetaStep(step, *info[1:])
+    return MetaStep(step, *info[1:]), fx_test

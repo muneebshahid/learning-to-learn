@@ -32,11 +32,11 @@ logging = tf.logging
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("optimizer", "L2L", "Optimizer.")
-flags.DEFINE_string("path", None, "Path to saved meta-optimizer network.")
+flags.DEFINE_string("path", 'meta_optim', "Path to saved meta-optimizer network.")
 flags.DEFINE_integer("num_epochs", 100, "Number of evaluation epochs.")
 flags.DEFINE_integer("seed", None, "Seed for TensorFlow's RNG.")
 
-flags.DEFINE_string("problem", "simple", "Type of problem.")
+flags.DEFINE_string("problem", "mnist", "Type of problem.")
 flags.DEFINE_integer("num_steps", 100,
                      "Number of optimization steps per epoch.")
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate.")

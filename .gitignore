@@ -102,3 +102,5 @@ MNIST-data/*
 meta_optim/
 meta_optim/*
 
+log/
+log/*

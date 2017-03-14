@@ -35,6 +35,7 @@ logging = tf.logging
 
 
 FLAGS = flags.FLAGS
+flags.DEFINE_string("optimizer", "Adam", "Optimizer.")
 flags.DEFINE_string("save_path", None, "Path for saved meta-optimizer.")
 flags.DEFINE_integer("num_epochs", 10000, "Number of training epochs.")
 flags.DEFINE_integer("log_period", 10, "Log period.")
@@ -68,13 +69,26 @@ def main(_):
   # ims = test_data.images.reshape((-1, 28, 28, 1))
   # lbs = test_data.labels
   # Optimizer setup.
-  optimizer = meta.MetaOptimizer(**net_config)
-  minimize, fx_test = optimizer.meta_minimize(
-      problem, FLAGS.unroll_length,
-      learning_rate=FLAGS.learning_rate,
-      net_assignments=net_assignments,
-      second_derivatives=FLAGS.second_derivatives)
-  step, update, reset, cost_op, _ = minimize
+
+  if FLAGS.optimizer == "Adam":
+    cost_op = problem[0]()
+    fx_test = meta._make_with_custom_variables(problem[1], meta._get_variables(problem[0])[0])
+    problem_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+    problem_reset = tf.variables_initializer(problem_vars)
+
+    optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
+    optimizer_reset = tf.variables_initializer(optimizer.get_slot_names())
+    update = optimizer.minimize(cost_op)
+    reset = None #[problem_reset, optimizer_reset]
+    step = None
+  else:
+    optimizer = meta.MetaOptimizer(**net_config)
+    minimize, fx_test = optimizer.meta_minimize(
+        problem, FLAGS.unroll_length,
+        learning_rate=FLAGS.learning_rate,
+        net_assignments=net_assignments,
+        second_derivatives=FLAGS.second_derivatives)
+    step, update, reset, cost_op, _ = minimize
 
 
 
@@ -87,9 +101,9 @@ def main(_):
     total_cost = 0
     total_test_loss = 0
     for e in xrange(FLAGS.num_epochs):
-
+      update_step = [update, step] if step is not None else [update]
       # Training.
-      time, cost, test_loss = util.run_epoch(sess, cost_op, [update, step], reset,
+      time, cost, test_loss = util.run_epoch(sess, cost_op, update_step, reset,
                                   num_unrolls, test_loss=fx_test)
 
       total_time += time
@@ -119,14 +133,13 @@ def main(_):
         util.print_stats("EVALUATION", eval_cost, eval_time,
                          FLAGS.evaluation_epochs)
 
-        if FLAGS.save_path is not None and eval_cost < best_evaluation:
+        if FLAGS.save_path is not None and eval_cost < best_evaluation and FLAGS.optimizer != "Adam":
           print("Removing previously saved meta-optimizer")
           for f in os.listdir(FLAGS.save_path):
             os.remove(os.path.join(FLAGS.save_path, f))
           print("Saving meta-optimizer to {}".format(FLAGS.save_path))
           optimizer.save(sess, FLAGS.save_path)
           best_evaluation = eval_cost
-  sess.close()
 
 
 if __name__ == "__main__":

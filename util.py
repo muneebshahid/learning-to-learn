@@ -30,7 +30,8 @@ import problems
 def run_epoch(sess, cost_op, ops, reset, num_unrolls, test_loss=None):
   """Runs one optimization epoch."""
   start = timer()
-  sess.run(reset)
+  if reset is not None:
+    sess.run(reset)
   for _ in xrange(num_unrolls):
     cost = sess.run([cost_op] + ops)[0]
   test_cost = None if test_loss is None else sess.run(test_loss)
@@ -40,12 +41,12 @@ def run_epoch(sess, cost_op, ops, reset, num_unrolls, test_loss=None):
 def print_stats(header, total_error, total_time, n):
   """Prints experiment statistics."""
   print(header)
-  print("Log Mean Final Error: {:.2f}".format(np.log10(total_error / n)))
-  print("Mean epoch time: {:.2f} s".format(total_time / n))
+  print("Log Mean Final Error: {:.5f}".format(np.log10(total_error / n)))
+  print("Mean epoch time: {:.5f} s".format(total_time / n))
 
 def save_loss(loss, n, file_name, time):
     with open(file_name, 'a')  as log_file:
-        log_file.write("{:.2f}".format(np.log10(loss / n)) + " " + "{:.2f}".format(time) + "\n")
+        log_file.write("{:.5f}".format(np.log10(loss / n)) + " " + "{:.2f}".format(time) + "\n")
 
 
 
